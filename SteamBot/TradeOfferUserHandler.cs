@@ -1,7 +1,6 @@
 ﻿using SteamKit2;
 using SteamTrade;
 using SteamTrade.TradeOffer;
-using System;
 using System.Collections.Generic;
 using TradeAsset = SteamTrade.TradeOffer.TradeOffer.TradeStatusUser.TradeAsset;
 
@@ -24,7 +23,7 @@ namespace SteamBot
                 var myItems = offer.Items.GetMyItems();
                 var theirItems = offer.Items.GetTheirItems();
                 Log.Info("They want " + myItems.Count + " of my items.");
-                Log.Info("And I will get " +  theirItems.Count + " of their items.");
+                Log.Info("And I will get " + theirItems.Count + " of their items.");
 
                 //do validation logic etc
                 if (DummyValidation(myItems, theirItems))
@@ -104,7 +103,11 @@ namespace SteamBot
 
         public override void OnFriendRemove() { }
 
-        public override void OnLoginCompleted() { }
+        public override void OnLoginCompleted()
+        {
+
+            Bot.AcceptAllMobileTradeConfirmations();
+        }
 
         public override bool OnTradeRequest() { return false; }
 
@@ -130,12 +133,21 @@ namespace SteamBot
 
         private bool DummyValidation(List<TradeAsset> myAssets, List<TradeAsset> theirAssets)
         {
-            //compare items etc
-            if (myAssets.Count == theirAssets.Count)
+            if (myAssets.Count != 0)
+            {
+                if (IsAdmin)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else
             {
                 return true;
             }
-            return false;
         }
     }
 }
