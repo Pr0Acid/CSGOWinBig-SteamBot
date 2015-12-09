@@ -5,7 +5,7 @@
 "UseSeparateProcesses": "false",
 "AutoStartAllBots": "true",
 "Bots": [
-		 {
+	{
             "Username":"BOT USERNAME",
             "Password":"BOT PASSWORD",
             "ApiKey":"Bot specific apiKey",
