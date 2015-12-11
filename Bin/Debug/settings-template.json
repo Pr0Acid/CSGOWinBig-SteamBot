@@ -5,16 +5,16 @@
 "UseSeparateProcesses": "false",
 "AutoStartAllBots": "true",
 "Bots": [
-	{
+		 {
             "Username":"BOT USERNAME",
             "Password":"BOT PASSWORD",
-            "ApiKey":"Bot specific apiKey",
+			"ApiKey":"Bot specidifc apiKey",
             "DisplayName":"TestBot",
             "ChatResponse":"Hi there bro",
-	    "BotWebsiteURL":"Your website url",
-	    "BotWebsiteName":"Your website name",
-	    "BotDBPassword":"Your database password",
-	    "ProfitAdmin":"STEAMID64 of Admin account",
+			"BotWebsiteURL":"Your website url",
+			"BotWebsiteName":"Your website name",
+			"BotDBPassword":"Your database password",
+			"ProfitAdmin":"STEAMID64 of Admin account",
             "logFile": "TestBot.log",
             "BotControlClass": "SteamBot.DepositTradeOfferUserHandler",
             "MaximumTradeTime":180,
