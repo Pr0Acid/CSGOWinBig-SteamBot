@@ -160,13 +160,16 @@ namespace SteamBot
 
         public override void OnNewTradeOffer(TradeOffer offer)
         {
-            if (offer.EscrowEndDate != 0)
+
+            var escrow = Bot.GetEscrowDuration(offer.TradeOfferId);
+
+            if (escrow.DaysMyEscrow != 0 && escrow.DaysTheirEscrow != 0)
             {
                 doWebWithCatch(1, () =>
                 {
                     if (offer.Decline())
                     {
-                        Log.Error("User has not enabled Mobile Authenticator, offer declined.");
+                        Log.Error("User has not been using the Mobile Authenticator for 7 days or has turned off trade confirmations, offer declined.");
                     }
                 });
 
