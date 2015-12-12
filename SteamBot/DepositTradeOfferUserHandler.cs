@@ -163,7 +163,7 @@ namespace SteamBot
 
             var escrow = Bot.GetEscrowDuration(offer.TradeOfferId);
 
-            if (escrow.DaysMyEscrow != 0 && escrow.DaysTheirEscrow != 0)
+            if (escrow.DaysMyEscrow != 0 || escrow.DaysTheirEscrow != 0)
             {
                 doWebWithCatch(1, () =>
                 {
