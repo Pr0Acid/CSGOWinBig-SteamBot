@@ -1,12 +1,11 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using SteamKit2;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Windows.Forms;
-using Newtonsoft.Json;
-using SteamKit2;
 
 namespace SteamBot
 {
@@ -99,13 +98,16 @@ namespace SteamBot
         /// </summary>
         public void StopBots()
         {
-            mainLog.Debug("Shutting down all bot processes.");
-            foreach (var botProc in botProcs)
+            if (mainLog != null)
             {
-                botProc.Stop();
-            }
+                mainLog.Debug("Shutting down all bot processes.");
+                foreach (var botProc in botProcs)
+                {
+                    botProc.Stop();
+                }
 
-            mainLog.Dispose();
+                mainLog.Dispose();
+            }
             mainLog = null;
         }
 
@@ -170,7 +172,7 @@ namespace SteamBot
             {
                 bot.Start();
             }
-            
+
         }
 
         /// <summary>
