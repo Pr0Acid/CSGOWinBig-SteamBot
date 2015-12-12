@@ -55,6 +55,7 @@ namespace SteamBot
         /// The display name of bot to steam.
         /// </summary>
         public readonly string DisplayName;
+
         /// <summary>
         /// The chat response from the config file.
         /// </summary>

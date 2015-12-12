@@ -98,7 +98,7 @@
       <Name>SteamAuth</Name>
     </ProjectReference>
     <ProjectReference Include="..\SteamTrade\SteamTrade.csproj">
-      <Project>{6cec0333-81eb-40ee-85d1-941363626fc7}</Project>
+      <Project>{6CEC0333-81EB-40EE-85D1-941363626FC7}</Project>
       <Name>SteamTrade</Name>
     </ProjectReference>
   </ItemGroup>

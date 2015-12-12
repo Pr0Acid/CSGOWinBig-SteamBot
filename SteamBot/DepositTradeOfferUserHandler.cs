@@ -161,307 +161,281 @@ namespace SteamBot
         public override void OnNewTradeOffer(TradeOffer offer)
         {
 
-            var escrow = Bot.GetEscrowDuration(offer.TradeOfferId);
 
-            if (escrow.DaysMyEscrow != 0 || escrow.DaysTheirEscrow != 0)
+
+            //Get password from file on desktop
+            string pass = Bot.BotDBPassword;
+
+            //Get items in the trade, and ID of user sending trade
+            var theirItems = offer.Items.GetTheirItems();
+            var myItems = offer.Items.GetMyItems();
+            var userID = offer.PartnerSteamId;
+
+            bool shouldDecline = false;
+
+            //Check if they are trying to get items from the bot
+            if (myItems.Count > 0 || theirItems.Count == 0)
+            {
+                //shouldDecline = true;
+                Log.Error("Offer declined because the offer wasn't a gift; the user wanted items instead of giving.");
+            }
+
+            //Check to make sure all items are for CS: GO.
+            foreach (TradeAsset item in theirItems)
+            {
+                if (item.AppId != 730)
+                {
+                    shouldDecline = true;
+                    Log.Error("Offer declined because one or more items was not for CS: GO.");
+                }
+            }
+
+            //Check if there are more than 10 items in the trade
+            if (theirItems.Count > 5)
+            {
+                shouldDecline = true;
+                Log.Error("Offer declined because there were more than 5 items in the deposit.");
+            }
+
+            if (shouldDecline)
             {
                 doWebWithCatch(1, () =>
                 {
                     if (offer.Decline())
                     {
-                        Log.Error("User has not been using the Mobile Authenticator for 7 days or has turned off trade confirmations, offer declined.");
+                        Log.Error("Offer declined.");
                     }
                 });
 
+                return;
             }
-            else
+
+            Log.Success("Offer approved, accepting.");
+            //Send items to server and check if all items add up to more than $1.
+            //If they do, accept the trade. If they don't, decline the trade.
+            string postData = "password=" + pass;
+            postData += "&owner=" + userID;
+
+            string theirItemsJSON = JsonConvert.SerializeObject(theirItems);
+
+            postData += "&items=" + theirItemsJSON;
+
+            string url = Bot.BotWebsiteURL + "/php/check-items.php";
+            var request = (HttpWebRequest)WebRequest.Create(url);
+
+            var data = Encoding.ASCII.GetBytes(postData);
+
+            request.Method = "POST";
+            request.ContentType = "application/x-www-form-urlencoded";
+            request.ContentLength = data.Length;
+
+            using (var stream = request.GetRequestStream())
             {
+                stream.Write(data, 0, data.Length);
+            }
 
-                //Get password from file on desktop
-                string pass = Bot.BotDBPassword;
+            var response = (HttpWebResponse)request.GetResponse();
 
-                //Get items in the trade, and ID of user sending trade
-                var theirItems = offer.Items.GetTheirItems();
-                var myItems = offer.Items.GetMyItems();
-                var userID = offer.PartnerSteamId;
+            var responseString = new StreamReader(response.GetResponseStream()).ReadToEnd();
 
-                bool shouldDecline = false;
+            //Uncomment this line to view the response from check-items.php
+            //Log.Success ("Response received from check-items.php: \n" + responseString);
 
-                //Check if they are trying to get items from the bot
-                if (myItems.Count > 0 || theirItems.Count == 0)
+            JSONClass responseJsonObj = JsonConvert.DeserializeObject<JSONClass>(responseString);
+
+            if (responseJsonObj.success == 1)
+            {
+                //Get data array from json
+                var jsonData = responseJsonObj.data;
+
+                if (jsonData.minDeposit == 1)
                 {
-                    //shouldDecline = true;
-                    Log.Error("Offer declined because the offer wasn't a gift; the user wanted items instead of giving.");
-                }
-
-                //Check to make sure all items are for CS: GO.
-                foreach (TradeAsset item in theirItems)
-                {
-                    if (item.AppId != 730)
+                    doWebWithCatch(10, () =>
                     {
-                        shouldDecline = true;
-                        Log.Error("Offer declined because one or more items was not for CS: GO.");
-                    }
-                }
-
-                //Check if there are more than 10 items in the trade
-                if (theirItems.Count > 5)
-                {
-                    shouldDecline = true;
-                    Log.Error("Offer declined because there were more than 5 items in the deposit.");
-                }
-
-                if (shouldDecline)
-                {
-                    doWebWithCatch(1, () =>
-                    {
-                        if (offer.Decline())
+                        if (offer.Accept())
                         {
-                            Log.Error("Offer declined.");
+                            Log.Success("Offer accepted from " + userID);
+
+                            //Put items into the pot
+                            string urlPutItemsIn = Bot.BotWebsiteURL + "/php/deposit.php";
+                            var requestUrlPutItemsIn = (HttpWebRequest)WebRequest.Create(urlPutItemsIn);
+
+                            string postDataPutItemsIn = "password=" + pass;
+                            postDataPutItemsIn += "&owner=" + userID;
+                            postDataPutItemsIn += "&items=" + jsonData.allItems;
+                            //Log.Success (jsonData.allItems);
+
+                            var dataPutItemsIn = Encoding.ASCII.GetBytes(postDataPutItemsIn);
+
+                            requestUrlPutItemsIn.Method = "POST";
+                            requestUrlPutItemsIn.ContentType = "application/x-www-form-urlencoded";
+                            requestUrlPutItemsIn.ContentLength = dataPutItemsIn.Length;
+
+                            using (var stream = requestUrlPutItemsIn.GetRequestStream())
+                            {
+                                stream.Write(dataPutItemsIn, 0, dataPutItemsIn.Length);
+                            }
+
+                            var responsePutItemsIn = (HttpWebResponse)requestUrlPutItemsIn.GetResponse();
+                            string responsePutItemsInString = new StreamReader(responsePutItemsIn.GetResponseStream()).ReadToEnd();
+
+                            //Uncomment this line to view the response from deposit.php
+                            //Log.Success ("Response received from deposit.php: " + responsePutItemsInString);
+
+                            JSONClass responseJsonObjPutItemsIn = JsonConvert.DeserializeObject<JSONClass>(responsePutItemsInString);
+                            jsonData = responseJsonObjPutItemsIn.data;
                         }
                     });
 
-                    return;
-                }
-
-                Log.Success("Offer approved, accepting.");
-                //Send items to server and check if all items add up to more than $1.
-                //If they do, accept the trade. If they don't, decline the trade.
-                string postData = "password=" + pass;
-                postData += "&owner=" + userID;
-
-                string theirItemsJSON = JsonConvert.SerializeObject(theirItems);
-
-                postData += "&items=" + theirItemsJSON;
-
-                string url = Bot.BotWebsiteURL + "/php/check-items.php";
-                var request = (HttpWebRequest)WebRequest.Create(url);
-
-                var data = Encoding.ASCII.GetBytes(postData);
-
-                request.Method = "POST";
-                request.ContentType = "application/x-www-form-urlencoded";
-                request.ContentLength = data.Length;
-
-                using (var stream = request.GetRequestStream())
-                {
-                    stream.Write(data, 0, data.Length);
-                }
-
-                var response = (HttpWebResponse)request.GetResponse();
-
-                var responseString = new StreamReader(response.GetResponseStream()).ReadToEnd();
-
-                //Uncomment this line to view the response from check-items.php
-                //Log.Success ("Response received from check-items.php: \n" + responseString);
-
-                JSONClass responseJsonObj = JsonConvert.DeserializeObject<JSONClass>(responseString);
-
-                if (responseJsonObj.success == 1)
-                {
-                    //Get data array from json
-                    var jsonData = responseJsonObj.data;
-
-                    if (jsonData.minDeposit == 1)
+                    //Check if it should start the timer
+                    if (jsonData.startTimer == 1)
                     {
-                        doWebWithCatch(10, () =>
+                        //Check if the timer is already running.
+                        if (!timerRunning)
                         {
-                            if (offer.Accept())
-                            {
-                                Log.Success("Offer accepted from " + userID);
+                            timer = new System.Timers.Timer();
+                            timer.Elapsed += new ElapsedEventHandler(timerEvent);
+                            timer.Interval = 1000;
+                            timer.Start();
 
-                                //Put items into the pot
-                                string urlPutItemsIn = Bot.BotWebsiteURL + "/php/deposit.php";
-                                var requestUrlPutItemsIn = (HttpWebRequest)WebRequest.Create(urlPutItemsIn);
-
-                                string postDataPutItemsIn = "password=" + pass;
-                                postDataPutItemsIn += "&owner=" + userID;
-                                postDataPutItemsIn += "&items=" + jsonData.allItems;
-                                //Log.Success (jsonData.allItems);
-
-                                var dataPutItemsIn = Encoding.ASCII.GetBytes(postDataPutItemsIn);
-
-                                requestUrlPutItemsIn.Method = "POST";
-                                requestUrlPutItemsIn.ContentType = "application/x-www-form-urlencoded";
-                                requestUrlPutItemsIn.ContentLength = dataPutItemsIn.Length;
-
-                                using (var stream = requestUrlPutItemsIn.GetRequestStream())
-                                {
-                                    stream.Write(dataPutItemsIn, 0, dataPutItemsIn.Length);
-                                }
-
-                                var responsePutItemsIn = (HttpWebResponse)requestUrlPutItemsIn.GetResponse();
-                                string responsePutItemsInString = new StreamReader(responsePutItemsIn.GetResponseStream()).ReadToEnd();
-
-                                //Uncomment this line to view the response from deposit.php
-                                //Log.Success ("Response received from deposit.php: " + responsePutItemsInString);
-
-                                JSONClass responseJsonObjPutItemsIn = JsonConvert.DeserializeObject<JSONClass>(responsePutItemsInString);
-                                jsonData = responseJsonObjPutItemsIn.data;
-                            }
-                        });
-
-                        //Check if it should start the timer
-                        if (jsonData.startTimer == 1)
-                        {
-                            //Check if the timer is already running.
-                            if (!timerRunning)
-                            {
-                                timer = new System.Timers.Timer();
-                                timer.Elapsed += new ElapsedEventHandler(timerEvent);
-                                timer.Interval = 1000;
-                                timer.Start();
-
-                                timerRunning = true;
-                            }
+                            timerRunning = true;
                         }
+                    }
 
-                        //Check if the pot is over
-                        if (jsonData.potOver == 1)
+                    //Check if the pot is over
+                    if (jsonData.potOver == 1)
+                    {
+                        //End the timer
+                        timerTime = 0;
+                        timer.Stop();
+
+                        //Get items to give and keep, and the winner and their trade token
+                        var itemsToGive = jsonData.tradeItems;
+                        var itemsToKeep = jsonData.profitItems;
+
+                        string winnerSteamIDString = jsonData.winnerSteamId;
+                        SteamID winnerSteamID = new SteamID(winnerSteamIDString);
+
+                        string winnerTradeToken = jsonData.winnerTradeToken;
+
+                        Log.Success("Winner steam id: " + winnerSteamIDString + ", token: " + winnerTradeToken);
+
+                        //Get bot's inventory json
+                        string botInvUrl = "http://steamcommunity.com/profiles/" + Bot.SteamUser.SteamID.ConvertToUInt64() + "/inventory/json/730/2";
+                        var botInvRequest = (HttpWebRequest)WebRequest.Create(botInvUrl);
+                        var botInvResponse = (HttpWebResponse)botInvRequest.GetResponse();
+                        string botInvString = new StreamReader(botInvResponse.GetResponseStream()).ReadToEnd();
+
+                        BotInventory botInventory = JsonConvert.DeserializeObject<BotInventory>(botInvString);
+                        if (botInventory.success != true)
                         {
-                            //End the timer
-                            timerTime = 0;
-                            timer.Stop();
+                            Log.Error("An error occured while fetching the bot's inventory.");
+                            return;
+                        }
+                        var rgInventory = botInventory.rgInventory;
 
-                            //Get items to give and keep, and the winner and their trade token
-                            var itemsToGive = jsonData.tradeItems;
-                            var itemsToKeep = jsonData.profitItems;
+                        //Create trade offer for the winner
+                        var winnerTradeOffer = Bot.NewTradeOffer(winnerSteamID);
 
-                            string winnerSteamIDString = jsonData.winnerSteamId;
-                            SteamID winnerSteamID = new SteamID(winnerSteamIDString);
+                        //Loop through all winner's items and add them to trade
+                        List<long> alreadyAddedToWinnerTrade = new List<long>();
+                        foreach (CSGOItemFromWeb item in itemsToGive)
+                        {
+                            long classId = item.classId, instanceId = item.instanceId;
 
-                            string winnerTradeToken = jsonData.winnerTradeToken;
-
-                            Log.Success("Winner steam id: " + winnerSteamIDString + ", token: " + winnerTradeToken);
-
-                            //Get bot's inventory json
-                            string botInvUrl = "http://steamcommunity.com/profiles/" + Bot.SteamUser.SteamID.ConvertToUInt64() + "/inventory/json/730/2";
-                            var botInvRequest = (HttpWebRequest)WebRequest.Create(botInvUrl);
-                            var botInvResponse = (HttpWebResponse)botInvRequest.GetResponse();
-                            string botInvString = new StreamReader(botInvResponse.GetResponseStream()).ReadToEnd();
-
-                            BotInventory botInventory = JsonConvert.DeserializeObject<BotInventory>(botInvString);
-                            if (botInventory.success != true)
+                            //Loop through all inventory items and find the asset id for the item
+                            long assetId = 0;
+                            foreach (var inventoryItem in rgInventory)
                             {
-                                Log.Error("An error occured while fetching the bot's inventory.");
-                                return;
-                            }
-                            var rgInventory = botInventory.rgInventory;
+                                var value = inventoryItem.Value;
+                                long tAssetId = value.id, tClassId = value.classid, tInstanceId = value.instanceid;
 
-                            //Create trade offer for the winner
-                            var winnerTradeOffer = Bot.NewTradeOffer(winnerSteamID);
-
-                            //Loop through all winner's items and add them to trade
-                            List<long> alreadyAddedToWinnerTrade = new List<long>();
-                            foreach (CSGOItemFromWeb item in itemsToGive)
-                            {
-                                long classId = item.classId, instanceId = item.instanceId;
-
-                                //Loop through all inventory items and find the asset id for the item
-                                long assetId = 0;
-                                foreach (var inventoryItem in rgInventory)
+                                if (tClassId == classId && tInstanceId == instanceId)
                                 {
-                                    var value = inventoryItem.Value;
-                                    long tAssetId = value.id, tClassId = value.classid, tInstanceId = value.instanceid;
-
-                                    if (tClassId == classId && tInstanceId == instanceId)
+                                    //Check if this assetId has already been added to the trade
+                                    if (alreadyAddedToWinnerTrade.Contains(tAssetId))
                                     {
-                                        //Check if this assetId has already been added to the trade
-                                        if (alreadyAddedToWinnerTrade.Contains(tAssetId))
-                                        {
-                                            continue;
-                                            //This is for when there are 2 of the same weapon, but they have different assetIds
-                                        }
-                                        assetId = tAssetId;
-                                        break;
+                                        continue;
+                                        //This is for when there are 2 of the same weapon, but they have different assetIds
                                     }
+                                    assetId = tAssetId;
+                                    break;
                                 }
-
-                                //Log.Success ("Adding item to winner trade offer. Asset ID: " + assetId);
-
-                                winnerTradeOffer.Items.AddMyItem(730, 2, assetId, 1);
-                                alreadyAddedToWinnerTrade.Add(assetId);
                             }
-                            //Send trade offer to winner
-                            if (itemsToGive.Count > 0)
-                            {
-                                string winnerTradeOfferId, winnerMessage = "Congratulations, you have won on " + Bot.BotWebsiteName + "! Here are your items.";
 
-                                doWebWithCatch(-1, () =>
+                            //Log.Success ("Adding item to winner trade offer. Asset ID: " + assetId);
+
+                            winnerTradeOffer.Items.AddMyItem(730, 2, assetId, 1);
+                            alreadyAddedToWinnerTrade.Add(assetId);
+                        }
+                        //Send trade offer to winner
+                        if (itemsToGive.Count > 0)
+                        {
+                            string winnerTradeOfferId, winnerMessage = "Congratulations, you have won on " + Bot.BotWebsiteName + "! Here are your items.";
+
+                            doWebWithCatch(-1, () =>
+                            {
+                                if (winnerTradeOffer.SendWithToken(out winnerTradeOfferId, winnerTradeToken, winnerMessage))
                                 {
-                                    if (winnerTradeOffer.SendWithToken(out winnerTradeOfferId, winnerTradeToken, winnerMessage))
-                                    {
-                                        Bot.AcceptAllMobileTradeConfirmations();
-                                        Log.Success("Offer sent to winner.");
-                                    }
-                                });
-                            }
-                            else
-                            {
-                                Log.Info("No items to give... strange");
-                            }
-
-                            //Now, send all of the profit items to my own account
-                            //Put your own Steam ID here
-
-                            var profitTradeOffer = Bot.NewTradeOffer(new SteamID(Bot.ProfitAdmin));
-
-                            //Loop through all profit items and add them to trade
-                            List<long> alreadyAddedToProfitTrade = new List<long>();
-                            foreach (CSGOItemFromWeb item in itemsToKeep)
-                            {
-                                long classId = item.classId, instanceId = item.instanceId;
-
-                                //Loop through all inventory items and find the asset id for the item
-                                long assetId = 0;
-                                foreach (var inventoryItem in rgInventory)
-                                {
-                                    var value = inventoryItem.Value;
-                                    long tAssetId = value.id, tClassId = value.classid, tInstanceId = value.instanceid;
-
-                                    if (tClassId == classId && tInstanceId == instanceId)
-                                    {
-                                        //Check if this assetId has already been added to the trade
-                                        if (alreadyAddedToProfitTrade.Contains(tAssetId))
-                                        {
-                                            continue;
-                                            //This is for when there are 2 of the same weapon, but they have different assetIds
-                                        }
-                                        assetId = tAssetId;
-                                        break;
-                                    }
+                                    Bot.AcceptAllMobileTradeConfirmations();
+                                    Log.Success("Offer sent to winner.");
                                 }
-
-                                //Log.Success ("Adding item to winner trade offer. Asset ID: " + assetId);
-
-                                profitTradeOffer.Items.AddMyItem(730, 2, assetId, 1);
-                                alreadyAddedToProfitTrade.Add(assetId);
-                            }
-
-                            //Send trade offer to myself with profit items
-                            Log.Success(itemsToKeep.Count + "");
-                            if (itemsToKeep.Count > 0)
-                            {
-                                string profitTradeOfferId, profitMessage = "Here are the profit items from the round.";
-
-                                doWebWithCatch(10, () =>
-                                {
-                                    if (profitTradeOffer.Send(out profitTradeOfferId, profitMessage))
-                                    { //Don't need the token because I am friends with the bot.
-                                        Bot.AcceptAllMobileTradeConfirmations();
-                                        Log.Success("Profit trade offer sent.");
-                                    }
-                                });
-                            }
+                            });
                         }
                         else
                         {
-                            //Only try this one time, because even if it gives an error, it still gets declined.
-                            doWebWithCatch(1, () =>
+                            Log.Info("No items to give... strange");
+                        }
+
+                        //Now, send all of the profit items to my own account
+                        //Put your own Steam ID here
+
+                        var profitTradeOffer = Bot.NewTradeOffer(new SteamID(Bot.ProfitAdmin));
+
+                        //Loop through all profit items and add them to trade
+                        List<long> alreadyAddedToProfitTrade = new List<long>();
+                        foreach (CSGOItemFromWeb item in itemsToKeep)
+                        {
+                            long classId = item.classId, instanceId = item.instanceId;
+
+                            //Loop through all inventory items and find the asset id for the item
+                            long assetId = 0;
+                            foreach (var inventoryItem in rgInventory)
                             {
-                                if (offer.Decline())
+                                var value = inventoryItem.Value;
+                                long tAssetId = value.id, tClassId = value.classid, tInstanceId = value.instanceid;
+
+                                if (tClassId == classId && tInstanceId == instanceId)
                                 {
-                                    Log.Error("Server deposit request failed, declining trade. Error message:\n" + responseJsonObj.errMsg);
+                                    //Check if this assetId has already been added to the trade
+                                    if (alreadyAddedToProfitTrade.Contains(tAssetId))
+                                    {
+                                        continue;
+                                        //This is for when there are 2 of the same weapon, but they have different assetIds
+                                    }
+                                    assetId = tAssetId;
+                                    break;
+                                }
+                            }
+
+                            //Log.Success ("Adding item to winner trade offer. Asset ID: " + assetId);
+
+                            profitTradeOffer.Items.AddMyItem(730, 2, assetId, 1);
+                            alreadyAddedToProfitTrade.Add(assetId);
+                        }
+
+                        //Send trade offer to myself with profit items
+                        Log.Success(itemsToKeep.Count + "");
+                        if (itemsToKeep.Count > 0)
+                        {
+                            string profitTradeOfferId, profitMessage = "Here are the profit items from the round.";
+
+                            doWebWithCatch(10, () =>
+                            {
+                                if (profitTradeOffer.Send(out profitTradeOfferId, profitMessage))
+                                { //Don't need the token because I am friends with the bot.
+                                    Bot.AcceptAllMobileTradeConfirmations();
+                                    Log.Success("Profit trade offer sent.");
                                 }
                             });
                         }
@@ -473,12 +447,22 @@ namespace SteamBot
                         {
                             if (offer.Decline())
                             {
-                                Log.Error("Minimum deposit not reached, offer declined.");
+                                Log.Error("Server deposit request failed, declining trade. Error message:\n" + responseJsonObj.errMsg);
                             }
                         });
                     }
                 }
-
+                else
+                {
+                    //Only try this one time, because even if it gives an error, it still gets declined.
+                    doWebWithCatch(1, () =>
+                    {
+                        if (offer.Decline())
+                        {
+                            Log.Error("Minimum deposit not reached, offer declined.");
+                        }
+                    });
+                }
             }
         }
 
