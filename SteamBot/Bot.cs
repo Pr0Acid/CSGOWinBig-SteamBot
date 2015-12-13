@@ -1165,7 +1165,7 @@ namespace SteamBot
                 }
                 else
                 {
-                    throw new TradeOfferEscrowDurationParseException();
+                    throw new TradeOfferEscrowDurationParseException(string.Empty);
                 }
             }
 
