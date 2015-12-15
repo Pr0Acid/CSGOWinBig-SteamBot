@@ -205,10 +205,10 @@ namespace SteamBot
                 }
 
                 //Check if there are more than 10 items in the trade
-                if (theirItems.Count > 5)
+                if (theirItems.Count > 10)
                 {
                     shouldDecline = true;
-                    Log.Error("Offer declined because there were more than 5 items in the deposit.");
+                    Log.Error("Offer declined because there were more than 10 items in the deposit.");
                 }
 
                 if (shouldDecline)
