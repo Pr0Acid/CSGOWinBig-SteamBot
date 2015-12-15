@@ -17,6 +17,10 @@ Retrieving the source code should be done by following the [installation guide] 
 
 See the [configuration guide] on the wiki. This guide covers configuring a basic bot as well as creating a custom user handler.
 
+## Using this Bot for CSGO Win Big
+
+To use this bot with the code from CSGO Win Big, follow the instructions [here](https://github.com/TheAnthonyNL/SteamBot/wiki/How-to-use-this-SteamBot-for-CSGOWINBIG).
+
 ## Bot Administration
 
 While running the bots you may find it necessary to do some basic operations like shutting down and restarting a bot. The console will take some commands to allow you to do some this. See the [usage guide] for more information.
